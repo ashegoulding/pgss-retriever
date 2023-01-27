@@ -1,0 +1,16 @@
+pgss-ret:
+  auth:
+    username: USERNAME
+    password: PASSWORD
+  dir:
+    cache: cache
+    tmp: tmp
+  limits:
+    eml-size: 5242880 # 5 MiB
+    nb-attachments: 20
+  mail:
+    backend:
+      style: mailx
+      exec: /usr/bin/mailx
+    recipients:
+      - person@example.com

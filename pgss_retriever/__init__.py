@@ -85,22 +85,22 @@ class AuthScriptParser (HTMLParser):
 
 	def handle_starttag (self, tag, attrs):
 		attrs = dict(attrs)
+		tag = tag.lower()
 
 		if self.form_data is None:
 			# State: looking for form tag
-			if (tag.lower() == "form"
+			if (tag == "form"
 				and attrs.get("name") == self.MAGIC.FORM_NAME.value):
 				self.form_data = {}
 		else:
 			# State: looking for input tags
-			match tag.lower():
-				case "form": raise exceptions.PageFormatError(
-					"Nested form encountered")
-				case "input":
-					name = attrs.get("name")
-					val = attrs.get("value", "")
-					if name:
-						self.form_data[name] = val
+			if tag == "form": raise exceptions.PageFormatError(
+				"Nested form encountered")
+			elif tag == "input":
+				name = attrs.get("name")
+				val = attrs.get("value", "")
+				if name:
+					self.form_data[name] = val
 
 class AuthErrorParser (HTMLParser):
 	def __init__ (self):
@@ -108,7 +108,7 @@ class AuthErrorParser (HTMLParser):
 		self.msg = None
 		self.__flag = False
 
-	def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]):
+	def handle_starttag(self, tag: str, attrs: list[tuple]):
 		attrs = dict(attrs)
 		cl = attrs.get("class")
 
@@ -237,7 +237,7 @@ class PGSSRetriever:
 		return datetime.utcnow().isoformat()
 
 	def __do_email (self, m: dict):
-		argv = [ self.conf["mail"]["exec"], "-s", "PGSS Payslip" ]
+		argv = [ self.conf["mail"]["backend"]["exec"], "-s", "PGSS Payslip" ]
 		for k in m.keys():
 			v = m[k]
 			tmp_fn = self.__get_tmpfile_path(k, v["filename"])
@@ -312,25 +312,24 @@ class PGSSRetriever:
 		proc = {}
 
 		if new_cache:
-			match self.conf["init-mode"]:
-				case InitModes.SEND_LAST.value:
-					l = list(d)
-					l.sort()
+			if self.conf["init-mode"] == InitModes.SEND_LAST.value:
+				l = list(d)
+				l.sort()
 
-					d = set([l.pop()])
+				d = set([l.pop()])
 
-					for i in l:
-						proc[i] = theirs[i]
-						proc[i]["sent"] = None
+				for i in l:
+					proc[i] = theirs[i]
+					proc[i]["sent"] = None
 
-					del l
-				case InitModes.CACHE_ONLY.value:
-					for i in d:
-						proc[i] = theirs[i]
-						proc[i]["sent"] = None
-					d = set()
-				case InitModes.SEND_ALL.value: pass
-				case _: raise KeyError()
+				del l
+			elif self.conf["init-mode"] == InitModes.CACHE_ONLY.value:
+				for i in d:
+					proc[i] = theirs[i]
+					proc[i]["sent"] = None
+				d = set()
+			elif self.conf["init-mode"] == InitModes.SEND_ALL.value: pass
+			else: raise KeyError()
 		try:
 			# Retrieve delta
 			for i in d:
@@ -378,15 +377,14 @@ def ParseArgs (args: list[str]) -> ProgParams:
 			"version"
 		])
 	for t in opts[0]:
-		match t[0]:
-			case "-h" | "--help": ret.help = True
-			case "-V" | "--version": ret.version = True
-			case "-f":
-				if ret.conf:
-					raise exceptions.OptionError(
-						"Duplicate option '{opt}'".format(opt = t[0]))
-				else:
-					ret.conf = t[1]
+		if t[0] == "-h" or t[0] == "--help": ret.help = True
+		elif t[0] == "-V" or t[0] == "--version": ret.version = True
+		elif t[0] == "-f":
+			if ret.conf:
+				raise exceptions.OptionError(
+					"Duplicate option '{opt}'".format(opt = t[0]))
+			else:
+				ret.conf = t[1]
 
 	return ret
 
@@ -409,7 +407,7 @@ def __main__ ():
 		sys.stderr.write('''{msg}
 Run '{exec} --help' for usage.
 '''.format(
-	msg = e.msg,
+	msg = str(e),
 	exec = sys.argv[0]
 ))
 		sys.exit(2)
@@ -420,6 +418,10 @@ Run '{exec} --help' for usage.
 	if params.version:
 		print(Version.__str__())
 		ec = 0
+
+	if not params.conf:
+		sys.stderr.write("No config specified.\n")
+		sys.exit(2)
 
 	if ec is not None:
 		sys.exit(ec)
@@ -433,7 +435,7 @@ Run '{exec} --help' for usage.
 			ec = 0
 	except exceptions.AuthFailedError as e:
 		sys.stderr.write('''Login failed: {msg}
-'''.format(msg = e))
+'''.format(msg = str(e)))
 		ec = 1
 
 	sys.exit(ec)
