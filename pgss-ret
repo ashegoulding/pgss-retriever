@@ -1,5 +1,0 @@
-#!/bin/env python3
-
-import pgss_retriever
-
-pgss_retriever.__main__()

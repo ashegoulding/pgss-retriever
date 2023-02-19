@@ -2,11 +2,11 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name": "mani",
+			"name": "main",
 			"type": "python",
 			"request": "launch",
-			"program": "${workspaceFolder}/pgss-ret",
-			"cwd": "${workspaceFolder}",
+			"module": "pgssret",
+			"cwd": "${workspaceFolder}/src",
 			"console": "integratedTerminal",
 			"justMyCode": true,
 			"args": [

@@ -5,17 +5,14 @@ import os
 import re
 import shutil
 import subprocess
-import sys
 import urllib.parse
-from contextlib import contextmanager
 from datetime import datetime
 from enum import Enum
 from html.parser import HTMLParser
 
 import requests
-import yaml
 
-from pgss_retriever import exceptions
+from pgssret import exceptions
 
 
 class Version:
@@ -33,17 +30,10 @@ Revision: {rev}{name}{var}'''.format(
 	var = "Variant: " + Version.var if Version.var else ""
 )
 
-HELP_STR = '''Get and email pay slips from PGSS.
-Usage: {exec} -f <config>
-Options:
-  -f <config>:  use the yaml config file
-  -h, --help:   print this message and exit normally
-  -V,--version: print version info and exit normally'''
-
 class InitModes(Enum):
 	'''Initial invocation behaviour'''
 	SEND_LAST = 0 # Email one latest pay slip
-	CACHE_ONLY = 1 # Just remember the id of the latest pay slip
+	CACHE_ONLY = 1 # Just remember the id of the latest pay slip (no email)
 	SEND_ALL = 2 # Email all the pay slips
 
 ConfigSkel = {
@@ -359,83 +349,3 @@ class PGSSRetriever:
 			cache["last-run"] = self.__get_isotimestr()
 			with open(self.__get_cache_path(), "w") as f:
 				json.dump(cache, f, indent = 1)
-
-class ProgParams:
-	def __init__ (self):
-		self.conf = None
-		self.help = False
-		self.version = False
-
-def ParseArgs (args: list[str]) -> ProgParams:
-	ret = ProgParams()
-
-	opts = getopt.getopt(
-		args,
-		"f:hV",
-		[
-			"help",
-			"version"
-		])
-	for t in opts[0]:
-		if t[0] == "-h" or t[0] == "--help": ret.help = True
-		elif t[0] == "-V" or t[0] == "--version": ret.version = True
-		elif t[0] == "-f":
-			if ret.conf:
-				raise exceptions.OptionError(
-					"Duplicate option '{opt}'".format(opt = t[0]))
-			else:
-				ret.conf = t[1]
-
-	return ret
-
-@contextmanager
-def open_retriever (conf: dict) -> PGSSRetriever:
-	ret = PGSSRetriever(conf)
-
-	try:
-		ret.do_auth()
-		yield ret
-	finally:
-		ret.do_deauth()
-
-def __main__ ():
-	ec = None
-
-	try:
-		params = ParseArgs(sys.argv[1:])
-	except (getopt.GetoptError, exceptions.OptionError) as e:
-		sys.stderr.write('''{msg}
-Run '{exec} --help' for usage.
-'''.format(
-	msg = str(e),
-	exec = sys.argv[0]
-))
-		sys.exit(2)
-
-	if params.help:
-		print(HELP_STR.format(exec = sys.argv[0]))
-		ec = 0
-	if params.version:
-		print(Version.__str__())
-		ec = 0
-
-	if not params.conf:
-		sys.stderr.write("No config specified.\n")
-		sys.exit(2)
-
-	if ec is not None:
-		sys.exit(ec)
-
-	with open(params.conf) as f:
-		conf = yaml.load(f, yaml.Loader)["pgss-ret"]
-
-	try:
-		with open_retriever(conf) as pgss_r:
-			pgss_r.do_work(params)
-			ec = 0
-	except exceptions.AuthFailedError as e:
-		sys.stderr.write('''Login failed: {msg}
-'''.format(msg = str(e)))
-		ec = 1
-
-	sys.exit(ec)

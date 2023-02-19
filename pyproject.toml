@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pgssret"
+version = "0.0.0"
+dependencies = [ "PyYAML", "requests" ]
+authors = [
+  { name="David Timber", email="dxdt@dev.snart.me" },
+]
+description = "Get and email pay slips from PGSS"
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3.9",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/ashegoulding/pgss-retriever"
+"Bug Tracker" = "https://github.com/ashegoulding/pgss-retriever/issues"
+
+[tool.hatch.build.targets.wheel.shared-data]
+"docs" = "share/doc/pgssret"
