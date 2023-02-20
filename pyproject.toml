@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pgssret"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [ "PyYAML", "requests" ]
 authors = [
   { name="David Timber", email="dxdt@dev.snart.me" },

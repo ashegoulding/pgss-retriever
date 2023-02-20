@@ -18,7 +18,7 @@ from pgssret import exceptions
 
 
 class Version:
-	dot_ver = "0.0.0"
+	dot_ver = "0.0.1"
 	rev = 0
 	name = None
 	var = None
