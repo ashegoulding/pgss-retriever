@@ -1,16 +1,18 @@
-import getopt
+import getpass
 import json
-import locale
 import os
 import re
 import shutil
-import subprocess
+from ssl import SSLContext
+import ssl
 import urllib.parse
 from datetime import datetime
 from enum import Enum
 from html.parser import HTMLParser
 
 import requests
+import smtplib
+from email.message import EmailMessage
 
 from pgssret import exceptions
 
@@ -53,12 +55,7 @@ ConfigSkel = {
 		"eml-size": 5242880, # 5 MiB
 		"nb-attachments": 20
 	},
-	"init-mode": 0,
-	"mail": {
-		"backend": "mailx",
-		"exec": "/usr/bin/mailx"
-		# "recipients": []
-	}
+	"init-mode": 0
 }
 
 RetTaskParamSkel = {
@@ -151,6 +148,8 @@ def decode_html (r: requests.Response) -> str:
 	return str(r.content, r.encoding)
 
 class PGSSRetriever:
+	post_backend_map = {}
+
 	def __init__ (self, conf: dict):
 		self.conf = ConfigSkel | conf
 		self.session = None
@@ -226,40 +225,88 @@ class PGSSRetriever:
 	def __get_isotimestr (self) -> str:
 		return datetime.utcnow().isoformat()
 
-	def __do_email (self, m: dict):
-		argv = [ self.conf["mail"]["backend"]["exec"], "-s", "PGSS Payslip" ]
+	def __do_post_smtplib (self,
+		subject: str,
+		body: str,
+		m: map,
+		recipients: list,
+		params: map):
+		def tail (c: smtplib.SMTP, sslctx: SSLContext = None):
+			if sslctx:
+				try: c.starttls(context = sslctx)
+				except:
+					if params.get("allow-plaintext", False): pass
+					else: raise
+
+			cred = params.get("cred")
+			if cred:
+				c.user = cred.get("username")
+				c.password = cred.get("password")
+
+			c.send_message(mail)
+
+		mail = EmailMessage()
+
+		mail["From"] = params.get("from", getpass.getuser())
+		mail["To"] = ", ".join(recipients)
+
 		for k in m.keys():
 			v = m[k]
 			tmp_fn = self.__get_tmpfile_path(k, v["filename"])
-			argv.append("-a")
-			argv.append(tmp_fn)
-		argv += self.conf["mail"]["recipients"]
+			with open(tmp_fn, "rb") as fp:
+				# TODO: timestamp and filetype
+				mail.add_attachment(
+					fp.read(),
+					maintype = "application",
+					subtype = "octet-stream")
 
-		sys_enc = None
-		loc = locale.getdefaultlocale()
-		if len(loc) >= 2: sys_enc = loc[1]
+		proto_str = params["proto"]
+		host = params.get("host", "localhost")
+		tlsca = params.get("ca")
+		tlskey = params.get("tlskey")
+		tlscert = params.get("tlscert")
 
-		with subprocess.Popen(
-			argv,
-			stdin = subprocess.PIPE) as p:
-			# Careful with the locale. The IO could be in encoding other
-			# than utf-8. In this case, getdefaultlocale() shouldn't return
-			# "utf-8"
-			p.stdin.write(
-'''Attached: pay slip(s) for employee #{username} retrieved from PGSS'''.format(
-	username = self.conf["auth"]["username"]
-).encode(sys_enc))
-			p.stdin.close()
+		def init_ssl () -> SSLContext:
+			if tlsca or tlskey or tlscert:
+				rv = SSLContext()
+				rv.load_verify_locations(tlsca)
+				rv.load_cert_chain(tlscert, tlskey, params.get("tlskeypw"))
+			else:
+				rv = ssl.create_default_context()
 
-			ec = p.wait()
-			if ec != 0:
-				raise ChildProcessError(
-					"Child process returned exit code: {ec}".format(ec = ec))
+		if proto_str == "lmtp":
+			with smtplib.LMTP(host, params.get("port", smtplib.LMTP_PORT)) as c:
+				c.connect()
+				tail(c)
+		elif proto_str == "smtp":
+			with smtplib.SMTP(host, params.get("port", 0)) as c:
+				tail(c, init_ssl())
+		elif proto_str == "smtps":
+			with smtplib.SMTP_SSL(
+				host,
+				params.get("port", 0),
+				context = init_ssl()) as c:
+				tail(c)
+		else: raise KeyError()
 
 		ts = self.__get_isotimestr()
 		for i in m.values():
 			print(i)
 			i["sent"] = ts
+
+	post_backend_map["smtplib"] = __do_post_smtplib
+
+	def __do_post (self, m: dict):
+		backend_method = PGSSRetriever.post_backend_map[
+			self.conf["post"]["backend"]]
+		return backend_method(
+			self,
+			self.conf["post"]["subject"],
+			self.conf["post"]["body"],
+			m,
+			self.conf["post"]["recipients"],
+			self.conf["post"]["params"]
+		)
 
 	def __do_prep_dirs (self):
 		os.makedirs(name = self.conf["dir"]["cache"], mode = 0o755, exist_ok = True)
@@ -337,7 +384,7 @@ class PGSSRetriever:
 					i = d_l.pop()
 					att_q[i] = theirs[i]
 					size_sum += theirs[i]["size"]
-				self.__do_email(att_q)
+				self.__do_post(att_q)
 				proc |= att_q
 				att_q.clear()
 		except:

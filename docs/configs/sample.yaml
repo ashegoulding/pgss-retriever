@@ -8,9 +8,21 @@ pgss-ret:
   limits:
     eml-size: 5242880 # 5 MiB
     nb-attachments: 20
-  mail:
-    backend:
-      style: mailx
-      exec: /usr/bin/mailx
+  post:
+    subject: Pay Slip from Compass Group
+    body: See attached.
+    backend: smtplib
+    params:
+      proto: smtp # or 'smtps' or 'lmtp'
+      # from: from@example.com
+      # Allow use of unencrypted session. Set to true if using localhost
+      # allow-plaintext: false
+      # host: smtp.example.com
+      # port:
+      # tlscert:
+      # tlskey:
+      # cred: # smtp auth credentials
+      #   username:
+      #   password:
     recipients:
-      - person@example.com
+      # - person@example.com

@@ -5,6 +5,8 @@
 		"mailx",
 		"PGSS",
 		"pgssret",
-		"Skel"
+		"Skel",
+		"smtps",
+		"tlscert"
 	]
 }
