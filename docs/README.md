@@ -124,13 +124,13 @@ making a "oneshot" Systemd service or dropping a shell script in rc.d.
 
 On Windows, Task Scheduler can do the trick.
 
-![Task Scheduler dialog "General" tab](sched_prop-general.png)
+![Task Scheduler dialog "General" tab](/docs/sched_prop-general.png)
 
-![Task Scheduler dialog "Trigger" tab](sched_prop-trigger.png)
+![Task Scheduler dialog "Trigger" tab](/docs/sched_prop-trigger.png)
 
-![Task Scheduler dialog "Action" tab](sched_prop-action.png)
+![Task Scheduler dialog "Action" tab](/docs/sched_prop-action.png)
 
-![Task Scheduler dialog "Settings" tab](sched_prop-settings.png)
+![Task Scheduler dialog "Settings" tab](/docs/sched_prop-settings.png)
 
 ### Gmail Example
 If you plan to use an external SMTP rather than a local one and set up a mail
